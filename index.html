@@ -13604,6 +13604,99 @@ const SAAR_HF_TEXT = {
    GESAMTBERICHT – konsolidierte Zusammenführung aller Bausteine,
    als mehrseitiges PDF exportierbar (html2canvas + jsPDF).
    ============================================================ */
+
+/* Saarlandspezifische Kurzcharakteristik je Kreisgebiet für den
+   Fließtext des Berichts (Kapitel 1.4 Räumliches Lagebild).
+   Fachlich verankerte, qualitative Einordnung – die quantitativen
+   Aussagen daneben werden aus KLIMASTECKBRIEFE berechnet. */
+const SAAR_KREIS_KONTEXT={
+  "10041":"Der Regionalverband Saarbrücken ist das dichtest besiedelte Kreisgebiet des Landes. "+
+    "Die hohe Versiegelung der Tallagen entlang der Saar verstärkt den städtischen Wärmeinseleffekt; "+
+    "zugleich wirken Saarkohlenwald und Köllertal als wichtige Kalt- und Frischluftlieferanten. "+
+    "Mit der Landeshauptstadt konzentrieren sich hier besonders viele hitzesensible Einrichtungen "+
+    "(Kliniken, Pflege, Kitas) auf engem Raum.",
+  "10042":"Merzig-Wadern ist ländlich geprägt und überdurchschnittlich waldreich (Saar-Hochwald). "+
+    "Die Saarniederung um Merzig und Mettlach ist hochwassersensibel, die Grenzlage zu Luxemburg "+
+    "und Frankreich macht grenzüberschreitendes Krisen- und Wassermanagement zur Daueraufgabe. "+
+    "Der Tourismus rund um die Saarschleife ist von Wald- und Landschaftsbild abhängig.",
+  "10043":"Der Landkreis Neunkirchen steht exemplarisch für den Strukturwandel: Bergbaufolgeflächen "+
+    "und der kontrollierte Grubenwasseranstieg überlagern sich mit den Klimafolgen. Die dicht "+
+    "bebauten Tallagen entlang von Blies und Oster sind sowohl hitze- als auch "+
+    "starkregenempfindlich.",
+  "10044":"Im Landkreis Saarlouis konzentriert sich industrielle Produktion (Stahl, Automotive) im "+
+    "Saartal – kritische Infrastrukturen und Gewerbestandorte liegen dort teils in "+
+    "hochwassersensiblen Lagen von Saar, Prims und Nied. Der Kreis gehört zur warmen, "+
+    "niederschlagsarmen Saarschiene.",
+  "10045":"Der Saarpfalz-Kreis umfasst mit dem Biosphärenreservat Bliesgau ausgedehnte, klimasensible "+
+    "Trocken- und Magerstandorte auf Muschelkalk. Das Blies-Hochwasser vom Mai 2024 (u. a. "+
+    "Blieskastel) hat die Verwundbarkeit der Talorte gezeigt; mit Universitätsklinikum und "+
+    "Industrie in Homburg besteht zugleich hohe Infrastrukturrelevanz.",
+  "10046":"St. Wendel ist das höchstgelegene und kühlste Kreisgebiet (Schwarzwälder Hochwald) – "+
+    "zugleich das niederschlagsreichste. Wald- und Landwirtschaft prägen die Fläche; "+
+    "Trockenstress im Wald und Starkregen in den Tallagen sind die zentralen Klimafolgen. "+
+    "Der Bostalsee-Tourismus profitiert tendenziell von wärmeren Sommern.",
+};
+
+/* Kompakte Kreisbezeichnung für Tabellen/Karten im Bericht */
+const SAAR_KREIS_KURZNAME={
+  "10041":"RV Saarbrücken","10042":"Merzig-Wadern","10043":"Neunkirchen",
+  "10044":"Saarlouis","10045":"Saarpfalz-Kreis","10046":"St. Wendel",
+};
+
+/* Kreisscharfe Kennwerte + Projektionsdeltas für das Lagebild –
+   einzige Lesestelle: KLIMASTECKBRIEFE (GERICS, kreisscharf). */
+function lagebildDaten(szId){
+  const sz=(SZ_BY_ID[szId]&&SZ_BY_ID[szId].gerics)?szId:LEITSZENARIO;
+  const kreise=SAARLAND_KREIS_AGS.map(ags=>{
+    const sb=KLIMASTECKBRIEFE[ags]||{};
+    const p=(sb.gerics_proj||{})[sz]||{};
+    return {ags, name:(SAAR_KREIS_KURZNAME[ags]||ags),
+      t:sb.t, ht:sb.ht, st:sb.st, ft:sb.ft, nsr:sb.starkregentage, nsj:sb.niederschlag_jahr,
+      dT:p.dT, dHt:p.dHt, dSt:p.dSt, dFt:p.dFt};
+  });
+  return {sz, kreise, land:KLIMASTECKBRIEFE["10000"]||{}};
+}
+
+/* Statische Saarlandkarte für Bericht & Deckblatt (nicht interaktiv;
+   html2canvas-sicher: nur Inline-SVG, feste Hex-Farben).
+   modus "locator": Gebietskulisse mit Hervorhebung des Analysegebiets.
+   modus "choropleth": Kreisflächen nach fills/labels eingefärbt. */
+function ReportSaarKarte({modus="locator",hervorAgs5=null,fills={},labels={},breite=300}){
+  const hoehe=Math.round(breite*SAAR_GEO.viewH/SAAR_GEO.viewW);
+  const alle=hervorAgs5==null;
+  return (
+    <svg viewBox={"0 0 "+SAAR_GEO.viewW+" "+SAAR_GEO.viewH} width={breite} height={hoehe}
+      style={{display:"block"}} aria-hidden="true">
+      {SAAR_GEO.kreise.map(k=>{
+        const fill = modus==="choropleth"
+          ? (fills[k.ags]||"#eef0f2")
+          : ((alle||k.ags===hervorAgs5)?"#9ec3e8":"#e8f0fa");
+        return <path key={k.ags} d={k.d} fill={fill} stroke="#ffffff" strokeWidth="2"/>;
+      })}
+      {SAAR_GEO.gemeinden.map(g=>(
+        <path key={"g"+g.ags} d={g.d} fill="none" stroke="rgba(255,255,255,.55)"
+          strokeWidth="0.7"/>
+      ))}
+      {SAAR_GEO.kreise.map(k=>(
+        <path key={"r"+k.ags} d={k.d} fill="none" stroke="#ffffff" strokeWidth="2.4"
+          strokeLinejoin="round"/>
+      ))}
+      {hervorAgs5 && SAAR_GEO.kreise.filter(k=>k.ags===hervorAgs5).map(k=>(
+        <path key={"h"+k.ags} d={k.d} fill="none" stroke="#0050a0" strokeWidth="4.2"
+          strokeLinejoin="round"/>
+      ))}
+      <path d={SAAR_GEO.land} fill="none" stroke="#3a4a5e" strokeWidth="2.6" strokeLinejoin="round"/>
+      {SAAR_GEO.kreise.map(k=>(
+        <text key={"t"+k.ags} x={k.cx} y={k.cy} textAnchor="middle"
+          fontSize={modus==="choropleth"?"21":"16"} fontWeight="700"
+          fill={modus==="choropleth"?"#1c2733":"#003c78"}
+          style={{paintOrder:"stroke",stroke:"#ffffffcc",strokeWidth:6}}>
+          {modus==="choropleth"?(labels[k.ags]??""):(SAAR_KREIS_KURZNAME[k.ags]||"")}
+        </text>
+      ))}
+    </svg>
+  );
+}
 function GesamtberichtModal({region,dwd,destatis,gerics,szenario,zeithorizont,gefMap,akMap,
     konfMap,konfLimiterMap,validMap,clusterRisiken,saarZiele,customMassnahmen,massnahmenStatus,stakeholderData,
     hfGefBySz,hfGefMapSz,hfRelevanz,onClose}){
@@ -13731,6 +13824,83 @@ function GesamtberichtModal({region,dwd,destatis,gerics,szenario,zeithorizont,ge
     return KONF_BY_ID[ids.reduce((a,b)=>KONF_RANG[a]<=KONF_RANG[b]?a:b)];
   })();
 
+  // ----- Räumliches Lagebild (Kapitel 1.4): kreisscharfe GERICS-Werte,
+  //       Rangfolgen und daraus generierter, gebietsspezifischer Fließtext -----
+  const lage=lagebildDaten(szenario);
+  const lageSzKurz=SZ_BY_ID[lage.sz]?SZ_BY_ID[lage.sz].kurz:"RCP 8.5";
+  const eigenKreis5=(region&&region.ags&&region.ags!=="10000")?String(region.ags).slice(0,5):null;
+  const lk=eigenKreis5?lage.kreise.find(k=>k.ags===eigenKreis5):null;
+  const rangHt=lk?1+lage.kreise.filter(k=>k.ht>lk.ht).length:null;
+  const lageMaxHt=[...lage.kreise].sort((a,b)=>b.ht-a.ht)[0];
+  const lageMinHt=[...lage.kreise].sort((a,b)=>a.ht-b.ht)[0];
+  const lageMaxNs=[...lage.kreise].sort((a,b)=>b.nsj-a.nsj)[0];
+  const lageMinNs=[...lage.kreise].sort((a,b)=>a.nsj-b.nsj)[0];
+  // Choroplethen-Füllungen: Heiße Tage in der nahen Zukunft (Referenz + GERICS-Delta)
+  const lageWert=(k)=>k.ht!=null?k.ht+(k.dHt||0):null;
+  const lageWMin=Math.min(...lage.kreise.map(lageWert).filter(v=>v!=null));
+  const lageWMax=Math.max(...lage.kreise.map(lageWert).filter(v=>v!=null));
+  const lageFills=Object.fromEntries(lage.kreise.map(k=>{
+    const v=lageWert(k);
+    const t=v==null?0.5:(lageWMax>lageWMin?(v-lageWMin)/(lageWMax-lageWMin):0.5);
+    return [k.ags, mischFarbe("#f2ede3","#c5462f",0.08+0.92*t)];
+  }));
+  const lageLabels=Object.fromEntries(lage.kreise.map(k=>{
+    const v=lageWert(k); return [k.ags, v==null?"":deZahl(v,0)];
+  }));
+  // Generierte Lagebild-Absätze (deterministisch aus den Kreiswerten)
+  const lageVergleich=lk
+    ? (lk.ht-lage.land.ht>0.5?"über dem Landesmittel von "+deZahl(lage.land.ht,1)+" Tagen"
+      : lk.ht-lage.land.ht<-0.5?"unter dem Landesmittel von "+deZahl(lage.land.ht,1)+" Tagen"
+      : "etwa im Landesmittel ("+deZahl(lage.land.ht,1)+" Tage)")
+    : null;
+  const lageText = lk ? [
+    SAAR_KREIS_KONTEXT[eigenKreis5]||"",
+    "Mit "+deZahl(lk.ht,0)+" heißen Tagen und "+deZahl(lk.st,0)+" Sommertagen pro Jahr "+
+    "(Referenz 1971–2000) liegt "+gebietNom+" "+lageVergleich+" – Rang "+rangHt+" der sechs "+
+    "saarländischen Kreisgebiete. Den höchsten Wert erreicht "+lageMaxHt.name+" ("+
+    deZahl(lageMaxHt.ht,0)+" Tage), den niedrigsten "+lageMinHt.name+" ("+deZahl(lageMinHt.ht,0)+
+    " Tage). Der mittlere Jahresniederschlag beträgt "+deZahl(lk.nsj,0)+" mm (Spanne der Kreise: "+
+    deZahl(lageMinNs.nsj,0)+" mm in "+lageMinNs.name+" bis "+deZahl(lageMaxNs.nsj,0)+" mm in "+
+    lageMaxNs.name+"); Starkregen (≥ 20 mm/Tag) tritt an rund "+deZahl(lk.nsr,1)+" Tagen im Jahr auf.",
+    "Für die nahe Zukunft (2021–2050) weist der kreisscharfe GERICS-Klimaausblick im Szenario "+
+    lageSzKurz+" eine Erwärmung um rund "+deZahl(lk.dT,1)+" °C gegenüber 1971–2000 aus; hinzu "+
+    "kommen etwa "+deZahl(lk.dHt,0)+" zusätzliche heiße Tage und "+deZahl(lk.dSt,0)+
+    " zusätzliche Sommertage pro Jahr, während die Zahl der Frosttage um rund "+
+    deZahl(Math.abs(lk.dFt||0),0)+" Tage zurückgeht. "+
+    (rangHt<=2
+      ? "Hitzevorsorge ist damit für dieses Kreisgebiet die zentrale Anpassungsaufgabe – die Karte zeigt, dass es bereits heute zu den wärmsten Lagen des Landes gehört."
+      : "Auch in diesem vergleichsweise "+(rangHt>=5?"kühlen":"moderaten")+" Kreisgebiet verschiebt sich das Klima damit spürbar in Richtung der heute wärmsten Lagen des Landes."),
+  ] : [
+    "Innerhalb des Saarlands unterscheiden sich die klimatischen Ausgangsbedingungen deutlich: "+
+    "Die warme, dicht besiedelte Saarschiene ("+lageMaxHt.name+": "+deZahl(lageMaxHt.ht,0)+
+    " heiße Tage pro Jahr, Referenz 1971–2000) steht dem kühleren, höher gelegenen Nordosten "+
+    "gegenüber ("+lageMinHt.name+": "+deZahl(lageMinHt.ht,0)+" heiße Tage). Beim Jahresniederschlag "+
+    "reicht die Spanne von "+deZahl(lageMinNs.nsj,0)+" mm ("+lageMinNs.name+") bis "+
+    deZahl(lageMaxNs.nsj,0)+" mm ("+lageMaxNs.name+") – die Höhenlagen des Hochwalds erhalten "+
+    "deutlich mehr Niederschlag und Starkregentage als die Tallagen der Saar.",
+    "Für die nahe Zukunft (2021–2050) weist der GERICS-Klimaausblick im Szenario "+lageSzKurz+
+    " landesweit eine Erwärmung um rund "+deZahl(lage.land.dT,1)+" °C sowie etwa "+
+    deZahl(lage.land.dHt,0)+" zusätzliche heiße Tage pro Jahr aus. Die räumlichen Unterschiede "+
+    "bleiben dabei bestehen: Wirksame Anpassung muss deshalb kreisspezifisch ansetzen – "+
+    "Hitzeaktionsplanung und Stadtklimamaßnahmen vorrangig entlang der Saarschiene, Wald-, "+
+    "Wasserrückhalte- und Schwammlandschaftskonzepte in den niederschlagsreichen Höhenlagen.",
+  ];
+
+  /* ----------------------------------------------------------
+     PDF-EXPORT mit echtem Satzspiegel:
+     - data-pdf-block        atomare Inhaltsblöcke (werden nie
+                             mitten im Text zerschnitten; Blöcke,
+                             die nicht mehr passen, beginnen auf
+                             einer neuen Seite)
+     - data-pdf-chapter="…"  Kapitelanfang: erzwingt Seitenumbruch,
+                             setzt die Kolumnentitel-Kopfzeile und
+                             erzeugt einen Eintrag im automatisch
+                             eingefügten Inhaltsverzeichnis
+     - data-pdf-cover        Deckblatt (ohne Kopf-/Fußzeile)
+     Kopfzeile (Kolumnentitel), Fußzeile (Paginierung) und das
+     Inhaltsverzeichnis werden vektorbasiert mit jsPDF gesetzt –
+     der Seiteninhalt wird blockweise über html2canvas gerendert.
+     ---------------------------------------------------------- */
   async function exportPDF(){
     setBusy(true);
     try{
@@ -13741,18 +13911,33 @@ function GesamtberichtModal({region,dwd,destatis,gerics,szenario,zeithorizont,ge
       if(document.fonts && document.fonts.ready){ try{ await document.fonts.ready; }catch(e){} }
 
       const { jsPDF }=window.jspdf;
-      const pdf=new jsPDF({orientation:"p",unit:"mm",format:"a4"});
+      const pdf=new jsPDF({orientation:"p",unit:"mm",format:"a4",compress:true});
       const pw=pdf.internal.pageSize.getWidth();   // 210
       const ph=pdf.internal.pageSize.getHeight();  // 297
-      const margin=12;
-      const contentW=pw-margin*2;
-      let cursorY=margin;
+      const mX=16, mTop=24, mBot=20;               // Satzspiegel
+      const contentW=pw-mX*2;
+      const maxBlockH=ph-mTop-mBot;
+      let cursorY=mTop;
       let erste=true;
+      let kapitel="";                 // aktueller Kolumnentitel
+      const seiteninfo={};            // Seite → Kapitel (für Kopfzeile)
+      const coverSeiten=new Set();    // Seiten ohne Kopf-/Fußzeile
+      const toc=[];                   // {titel, seite}
 
       const blocks=Array.from(reportRef.current.querySelectorAll("[data-pdf-block]"));
       if(blocks.length===0) throw new Error("Keine Inhaltsblöcke gefunden.");
 
+      const seite=()=>pdf.internal.getCurrentPageInfo().pageNumber;
+      const merkeKapitel=()=>{ if(seiteninfo[seite()]==null) seiteninfo[seite()]=kapitel; };
+
       for(const el of blocks){
+        const istCover=el.hasAttribute("data-pdf-cover");
+        const kapAttr=el.getAttribute("data-pdf-chapter");
+        if(kapAttr!=null){
+          if(!erste){ pdf.addPage(); cursorY=mTop; }
+          kapitel=kapAttr;
+          toc.push({titel:kapitel, seite:seite()});
+        }
         let canvas;
         try{
           canvas=await html2canvas(el,{scale:2,backgroundColor:"#ffffff",useCORS:true,
@@ -13760,41 +13945,105 @@ function GesamtberichtModal({region,dwd,destatis,gerics,szenario,zeithorizont,ge
         }catch(err){ console.warn("Block übersprungen:",err); continue; }
         if(!canvas || !canvas.width || !canvas.height) continue;
         const imgH=canvas.height*contentW/canvas.width;
-        const img=canvas.toDataURL("image/png");
+        // JPEG statt PNG: jsPDF bettet PNG-Canvases unkomprimiert ein
+        // (mehrere hundert MB bei langen Berichten); weißer Hintergrund
+        // ist gesetzt, daher verlustarm bei Qualität 0.92
+        const img=canvas.toDataURL("image/jpeg",0.92);
 
-        if(imgH<=ph-margin*2){
-          if(!erste && cursorY+imgH>ph-margin){ pdf.addPage(); cursorY=margin; }
-          pdf.addImage(img,"PNG",margin,cursorY,contentW,imgH);
-          cursorY+=imgH+5;
+        if(imgH<=maxBlockH){
+          if(!erste && cursorY+imgH>ph-mBot){ pdf.addPage(); cursorY=mTop; }
+          pdf.addImage(img,"JPEG",mX,cursorY,contentW,imgH);
+          merkeKapitel();
+          cursorY+=imgH+3.5;
         } else {
-          const pageContentH=ph-margin*2;
+          // Notfall-Pfad für übergroße Einzelblöcke (sollte durch die
+          // feingliedrige Blockstruktur praktisch nicht mehr auftreten)
           const pxPerMm=canvas.height/imgH;
-          const segPx=Math.floor(pageContentH*pxPerMm);
+          const segPx=Math.floor(maxBlockH*pxPerMm);
           let sy=0;
           if(!erste){ pdf.addPage(); }
-          cursorY=margin;
+          cursorY=mTop;
           while(sy<canvas.height){
             const hPx=Math.min(segPx,canvas.height-sy);
             const seg=document.createElement("canvas");
             seg.width=canvas.width; seg.height=hPx;
             seg.getContext("2d").drawImage(canvas,0,sy,canvas.width,hPx,0,0,canvas.width,hPx);
-            const segH=hPx/pxPerMm;
-            pdf.addImage(seg.toDataURL("image/png"),"PNG",margin,margin,contentW,segH);
+            pdf.addImage(seg.toDataURL("image/jpeg",0.92),"JPEG",mX,mTop,contentW,hPx/pxPerMm);
+            merkeKapitel();
             sy+=hPx;
-            if(sy<canvas.height){ pdf.addPage(); }
+            if(sy<canvas.height){ pdf.addPage(); cursorY=mTop; }
           }
           cursorY=ph; // nach übergroßem Block neue Seite erzwingen
         }
+        if(istCover){ coverSeiten.add(seite()); cursorY=ph; }
         erste=false;
       }
 
+      // ---- Inhaltsverzeichnis (nur Gesamtbericht, vektorbasiert) ----
+      const mitToc = modus==="gesamt" && toc.length>=3;
+      let tocSeite=0;
+      if(mitToc){
+        pdf.insertPage(2);            // wird Seite 2 (nach dem Deckblatt)
+        tocSeite=2;
+        // alle erfassten Seitennummern ab Position 2 verschieben sich um +1
+        toc.forEach(t=>{ if(t.seite>=2) t.seite+=1; });
+        const verschoben={};
+        Object.keys(seiteninfo).forEach(p=>{ const n=+p; verschoben[n>=2?n+1:n]=seiteninfo[p]; });
+        Object.keys(seiteninfo).forEach(p=>delete seiteninfo[p]);
+        Object.assign(seiteninfo,verschoben);
+
+        pdf.setPage(2);
+        pdf.setFont("helvetica","bold"); pdf.setFontSize(20); pdf.setTextColor(0,60,120);
+        pdf.text("Inhalt", mX, 34);
+        pdf.setDrawColor(0,80,160); pdf.setLineWidth(0.9);
+        pdf.line(mX, 38.5, mX+24, 38.5);
+        let y=50;
+        toc.forEach(t=>{
+          pdf.setFont("helvetica", /^\d/.test(t.titel)?"bold":"normal");
+          pdf.setFontSize(11); pdf.setTextColor(30,40,55);
+          const titel=t.titel.length>76?t.titel.slice(0,73)+"…":t.titel;
+          const nr=String(t.seite);
+          pdf.text(titel, mX, y);
+          const tw=pdf.getTextWidth(titel), nw=pdf.getTextWidth(nr);
+          // Punktführung zwischen Titel und Seitenzahl
+          pdf.setTextColor(150,158,168);
+          const dotStart=mX+tw+2.5, dotEnd=pw-mX-nw-2.5;
+          if(dotEnd>dotStart){
+            const punkt=". ";
+            const anzahl=Math.floor((dotEnd-dotStart)/pdf.getTextWidth(punkt));
+            if(anzahl>0) pdf.text(new Array(anzahl+1).join(punkt), dotStart, y);
+          }
+          pdf.setTextColor(30,40,55);
+          pdf.text(nr, pw-mX, y, {align:"right"});
+          y+=9.5;
+        });
+        pdf.setFontSize(8.5); pdf.setTextColor(120,128,140);
+        pdf.text("Bewertungsgrundlage: "+sz.kurz+" – Methodik: KWRA (UBA 2021), DIN EN ISO 14091, § 10 KAnG – Stand "+
+          new Date().toLocaleDateString("de-DE"), mX, y+4);
+      }
+
+      // ---- Kopf- und Fußzeilen (vektorbasiert) ----
       const n=pdf.internal.getNumberOfPages();
+      const kopfTitel="Klimarisiko & Anpassung – "+(region?region.name:"Saarland");
       for(let i=1;i<=n;i++){
+        if(coverSeiten.has(i)) continue;          // Deckblatt bleibt frei
         pdf.setPage(i);
-        pdf.setFontSize(8);
-        pdf.setTextColor(150);
-        pdf.text(`Seite ${i} von ${n}`, pw-margin, ph-6, {align:"right"});
-        pdf.text("IfaS Klimaanpassungs-Dashboard – "+(region?region.name:""), margin, ph-6);
+        if(i!==tocSeite){
+          const kap=seiteninfo[i]||"";
+          pdf.setFont("helvetica","normal"); pdf.setFontSize(8); pdf.setTextColor(120,128,140);
+          pdf.text(kopfTitel, mX, 12);
+          if(kap){
+            const kapKurz=kap.length>56?kap.slice(0,53)+"…":kap;
+            pdf.text(kapKurz, pw-mX, 12, {align:"right"});
+          }
+          pdf.setDrawColor(208,216,226); pdf.setLineWidth(0.25);
+          pdf.line(mX, 14.5, pw-mX, 14.5);
+        }
+        pdf.setDrawColor(208,216,226); pdf.setLineWidth(0.25);
+        pdf.line(mX, ph-13, pw-mX, ph-13);
+        pdf.setFont("helvetica","normal"); pdf.setFontSize(8); pdf.setTextColor(120,128,140);
+        pdf.text("IfaS Klimaanpassungs-Dashboard – Stand "+new Date().toLocaleDateString("de-DE"), mX, ph-8);
+        pdf.text("Seite "+i+" von "+n, pw-mX, ph-8, {align:"right"});
       }
 
       const datum=new Date().toISOString().slice(0,10);
@@ -13846,7 +14095,8 @@ function GesamtberichtModal({region,dwd,destatis,gerics,szenario,zeithorizont,ge
                 color:"var(--ifas-blue-dark)",margin:"0 0 6px"}}>
                 Klimarisiko &amp; Anpassung – Kurzfassung</h1>
               <div style={{fontFamily:"'Lora',serif",fontSize:15,color:"var(--ink)",marginBottom:6}}>
-                {gebietNom}<span style={{color:"var(--ink-soft)",fontSize:12.5}}> – {region?region.typ:""}</span>
+                {gebietNom}{region && !gebietNom.includes(region.typ) &&
+                  <span style={{color:"var(--ink-soft)",fontSize:12.5}}> – {region.typ}</span>}
               </div>
               <div style={{fontSize:10.5,color:"var(--ink-soft)",marginBottom:18}}>
                 Bewertungsgrundlage: {sz.kurz} (Leitszenario) – {zhAktiv.kurz} ({zhAktiv.label}) –
@@ -13969,16 +14219,34 @@ function GesamtberichtModal({region,dwd,destatis,gerics,szenario,zeithorizont,ge
           <React.Fragment>
 
             {/* ========== DECKBLATT ========== */}
-            <div data-pdf-block style={{padding:"40px 44px 28px"}}>
+            <div data-pdf-block data-pdf-cover style={{padding:"46px 44px 28px"}}>
               <div style={{fontSize:10,fontWeight:700,letterSpacing:".12em",textTransform:"uppercase",
                 color:"var(--ifas-green)",marginBottom:14}}>Klimaanpassung Saarland – IfaS</div>
               <div style={{height:4,width:60,background:"var(--ifas-blue)",marginBottom:18}}/>
-              <h1 style={{fontFamily:"'Lora',serif",fontSize:30,fontWeight:700,lineHeight:1.15,
-                color:"var(--ifas-blue-dark)",margin:"0 0 10px"}}>
-                Klimarisiko &amp; Anpassung</h1>
-              <div style={{fontFamily:"'Lora',serif",fontSize:18,color:"var(--ink)",marginBottom:24}}>
-                Dokumentation für {gebietNom}
-                <span style={{color:"var(--ink-soft)",fontSize:14}}> – {region?region.typ:""}</span>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 230px",gap:24,alignItems:"center",
+                marginBottom:26}}>
+                <div>
+                  <h1 style={{fontFamily:"'Lora',serif",fontSize:30,fontWeight:700,lineHeight:1.15,
+                    color:"var(--ifas-blue-dark)",margin:"0 0 10px"}}>
+                    Klimarisiko &amp; Anpassung</h1>
+                  <div style={{fontFamily:"'Lora',serif",fontSize:18,color:"var(--ink)",marginBottom:14}}>
+                    Dokumentation für {gebietNom}
+                    {region && !gebietNom.includes(region.typ) &&
+                      <span style={{color:"var(--ink-soft)",fontSize:14}}> – {region.typ}</span>}
+                  </div>
+                  <div style={{fontSize:11,color:"var(--ink-soft)",lineHeight:1.6,maxWidth:380}}>
+                    Klimarisikoanalyse und priorisierter Maßnahmenkatalog nach KWRA (UBA 2021) und
+                    DIN EN ISO 14091 im Rahmen des § 10 Klimaanpassungsgesetz – mit kreisscharfen
+                    GERICS-Klimaprojektionen und amtlichem Kartenmaterial.
+                  </div>
+                </div>
+                <div>
+                  <ReportSaarKarte modus="locator" hervorAgs5={eigenKreis5} breite={230}/>
+                  <div style={{fontSize:8.5,color:"var(--ink-mute)",marginTop:5,textAlign:"center"}}>
+                    {eigenKreis5?"Lage des Analysegebiets im Saarland":"Gebietskulisse: Saarland (Landesebene)"} –
+                    VG250 © GeoBasis-DE/BKG (dl-de/by-2-0)
+                  </div>
+                </div>
               </div>
               <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10,marginBottom:24}}>
                 {[
@@ -13989,8 +14257,10 @@ function GesamtberichtModal({region,dwd,destatis,gerics,szenario,zeithorizont,ge
                 ].map((k,i)=>(
                   <div key={i} style={{border:"1px solid var(--line)",borderRadius:8,padding:"12px",
                     borderTop:"3px solid "+k.c}}>
-                    <div style={{fontSize:9,color:"var(--ink-soft)",textTransform:"uppercase",
-                      letterSpacing:".03em",minHeight:30,lineHeight:1.3}}>{k.l}</div>
+                    {/* Uppercase in JS statt CSS: text-transform:uppercase + "ß" löst einen
+                        html2canvas-Range-Bug aus und ließ das Deckblatt im PDF ausfallen */}
+                    <div style={{fontSize:9,color:"var(--ink-soft)",
+                      letterSpacing:".03em",minHeight:30,lineHeight:1.3}}>{k.l.toUpperCase()}</div>
                     <div style={{fontFamily:"'Lora',serif",fontSize:21,fontWeight:600,color:k.c}}>{k.v}</div>
                   </div>
                 ))}
@@ -14015,7 +14285,7 @@ function GesamtberichtModal({region,dwd,destatis,gerics,szenario,zeithorizont,ge
             </div>
 
             {/* ========== ZUSAMMENFASSUNG ========== */}
-            <div data-pdf-block style={{padding:"8px 44px 20px"}}>
+            <div data-pdf-block data-pdf-chapter="Zusammenfassung" style={{padding:"8px 44px 20px"}}>
               <h1 style={rH1}>Zusammenfassung</h1>
               <div style={{height:3,width:44,background:"var(--ifas-green)",margin:"0 0 12px"}}/>
               <p style={rP}>
@@ -14043,6 +14313,16 @@ function GesamtberichtModal({region,dwd,destatis,gerics,szenario,zeithorizont,ge
                 Starkregenereignissen zunimmt.
               </p>}
               <p style={rP}>
+                Räumlich betrachtet {lk
+                  ? <>gehört {gebietNom} mit <strong>{deZahl(lk.ht,0)} heißen Tagen pro Jahr</strong> zu
+                    den {rangHt<=3?"wärmeren":"kühleren"} Kreisgebieten des Landes (Rang {rangHt} von 6,
+                    Referenz 1971–2000)</>
+                  : <>reicht die Spanne innerhalb des Landes von {deZahl(lageMinHt.ht,0)} heißen Tagen
+                    pro Jahr ({lageMinHt.name}) bis {deZahl(lageMaxHt.ht,0)} ({lageMaxHt.name})</>}
+                {" "}– das räumliche Lagebild in Kapitel 1.4 ordnet die Kennwerte kartenbasiert in den
+                Saarlandvergleich ein.
+              </p>
+              <p style={rP}>
                 Der Maßnahmenkatalog umfasst <strong>{alleMassnahmen.length} Maßnahmen</strong>, davon
                 {" "}{prioMass.length} mit sehr dringendem und {vordrMass.length} mit dringendem Handlungsbedarf.
                 Die Strategie folgt einem integrierten, vorsorgeorientierten Ansatz und priorisiert Maßnahmen,
@@ -14050,8 +14330,86 @@ function GesamtberichtModal({region,dwd,destatis,gerics,szenario,zeithorizont,ge
               </p>
             </div>
 
+            {/* ========== LESEHILFE (didaktischer Einstieg) ========== */}
+            <div data-pdf-block data-pdf-chapter="Lesehilfe – Wie dieser Bericht zu lesen ist"
+              style={{padding:"8px 44px 20px"}}>
+              <h1 style={rH1}>Lesehilfe – Wie dieser Bericht zu lesen ist</h1>
+              <div style={{height:3,width:44,background:"var(--ifas-green)",margin:"0 0 12px"}}/>
+              <p style={rP}>
+                Alle Risikoaussagen dieses Berichts folgen demselben Rechenweg nach DIN EN ISO 14091 und
+                KWRA (UBA 2021). Ausgangspunkt ist die klimatische <strong>Gefährdung</strong> je
+                Klimaeinfluss (Skala 0–3, aus Beobachtungsdaten und GERICS-Projektionen).{" "}
+                <strong>Exposition</strong> (Was ist dem Klimaeinfluss räumlich ausgesetzt?) und{" "}
+                <strong>Sensitivität</strong> (Wie empfindlich reagiert das System?) verschieben die
+                resultierende Risikostufe modifizierend – bewusst kein multiplikatives Modell, um
+                Scheingenauigkeit zu vermeiden. Die <strong>Anpassungskapazität</strong> mindert
+                schließlich das verbleibende <strong>Restrisiko</strong>.
+              </p>
+              <div style={{display:"flex",alignItems:"stretch",gap:0,flexWrap:"wrap",margin:"2px 0 14px"}}>
+                {[
+                  {t:"Gefährdung",s:"Klimasignal je Einfluss (0–3)",c:"#c0392b"},
+                  {pfeil:"modifiziert durch"},
+                  {t:"Exposition · Sensitivität",s:"räumliches Betroffensein · Empfindlichkeit",c:"#3d6e8a"},
+                  {pfeil:"ergibt"},
+                  {t:"Klimarisiko ohne Anpassung",s:"vier Stufen (1–4)",c:"#8c1a2e"},
+                  {pfeil:"gemindert um"},
+                  {t:"Anpassungskapazität",s:"6 KWRA-Determinanten",c:"#20a030"},
+                  {pfeil:"ergibt"},
+                  {t:"Restrisiko",s:"mit Anpassung",c:"#0050a0"},
+                ].map((b,i)=>b.pfeil
+                  ? <div key={i} style={{display:"flex",flexDirection:"column",alignItems:"center",
+                      justifyContent:"center",padding:"0 7px"}}>
+                      <span style={{fontSize:13,color:"var(--ink-mute)",lineHeight:1}}>→</span>
+                      <span style={{fontSize:6.5,color:"var(--ink-mute)",whiteSpace:"nowrap"}}>{b.pfeil}</span>
+                    </div>
+                  : <div key={i} style={{flex:"1 1 100px",minWidth:96,border:"1px solid "+hexRGBA(b.c,.45),
+                      borderTop:"3px solid "+b.c,borderRadius:7,padding:"7px 9px",background:hexRGBA(b.c,.05)}}>
+                      <div style={{fontSize:9.5,fontWeight:700,color:b.c,lineHeight:1.25}}>{b.t}</div>
+                      <div style={{fontSize:8,color:"var(--ink-soft)",lineHeight:1.3,marginTop:2}}>{b.s}</div>
+                    </div>
+                )}
+              </div>
+              <h2 style={rH2}>Die vierstufige Risikoskala</h2>
+              <div style={{display:"flex",gap:8,flexWrap:"wrap",margin:"2px 0 8px"}}>
+                {[0,1,2,3].map(i=>{ const k=riskClassByIdx(i); return (
+                  <div key={i} style={{flex:1,minWidth:110,borderRadius:7,padding:"8px 11px",
+                    background:k.hex,color:"#fff"}}>
+                    <div style={{fontSize:11.5,fontWeight:700}}>Stufe {i+1} – {k.label}</div>
+                    <div style={{fontSize:8.5,opacity:.92,marginTop:1}}>
+                      {i>=2?"schwerwiegende Folgen (wesentliches Klimarisiko)":"mäßige Folgen"}
+                    </div>
+                  </div>); })}
+              </div>
+              <div style={{fontSize:9.5,color:"var(--ink-mute)",marginBottom:14,lineHeight:1.45}}>
+                Score-Schwellen (0–3): {RISK_SCHWELLEN_TEXT}. Stufenwording nach GIZ Climate Risk
+                Sourcebook (Zebisch et al. 2023); projektspezifische Schwellen, bewusst abweichend von
+                UBA (2022), Tab. 5.
+              </div>
+              <h2 style={rH2}>In drei Schritten durch den Bericht</h2>
+              <ol style={{fontSize:11.5,lineHeight:1.7,color:"var(--ink)",margin:"0 0 12px",paddingLeft:20}}>
+                <li><strong>Wo stehen wir?</strong> Kapitel 1 beschreibt Klimagegenwart und -zukunft des
+                  Gebiets; das räumliche Lagebild (1.4) ordnet es kartenbasiert in den Saarlandvergleich ein.</li>
+                <li><strong>Wo ist das Risiko am größten?</strong> Kapitel 2 weist das Klimarisiko je
+                  Handlungsfeld aus. Lesen Sie die Tabellen zeilenweise (eine Zeile = eine Klimawirkung)
+                  und vergleichen Sie die Zeithorizonte: links die Gegenwart, rechts die Zukunft im
+                  optimistischen (RCP 2.6) und im Vorsorge-Pfad (RCP 8.5).</li>
+                <li><strong>Was ist zu tun?</strong> Kapitel 4 übersetzt die Risiken in priorisierte
+                  Maßnahmen – „sehr dringend" eingestufte Maßnahmen adressieren die Handlungsfelder mit
+                  dem höchsten Risiko und der geringsten Anpassungskapazität.</li>
+              </ol>
+              <InfoKasten titel="Belastbarkeit der Aussagen (Konfidenz)" akzent="#5a7a96">
+                <div style={{fontSize:11,lineHeight:1.55,color:"var(--ink)"}}>
+                  Jede Cluster-Bewertung trägt eine Konfidenz-Einstufung; für zusammenfassende Aussagen
+                  gilt die Minimum-Regel der KWRA (die vorsichtigste Einzeleinstufung bestimmt das Gesamtbild).
+                  Exposition- und Sensitivitätswerte sind fachlich überschreibbare Startwerte, keine
+                  Messgrößen – ihre Validierung durch die zuständigen Fachakteure ist Teil des Verfahrens.
+                </div>
+              </InfoKasten>
+            </div>
+
             {/* ========== 1 KLIMATISCHE AUSGANGSLAGE ========== */}
-            <div data-pdf-block style={{padding:"8px 44px 20px"}}>
+            <div data-pdf-block data-pdf-chapter="1 – Klimawandel und Relevanz für das Saarland"
+              style={{padding:"8px 44px 6px"}}>
               <h1 style={rH1}>1 – Klimawandel und Relevanz für das Saarland</h1>
               <h2 style={rH2}>1.1 Klimatische Ausgangslage</h2>
               <p style={rP}>
@@ -14082,6 +14440,8 @@ function GesamtberichtModal({region,dwd,destatis,gerics,szenario,zeithorizont,ge
                     </tr>); })}
                 </tbody>
               </table>
+            </div>
+            <div data-pdf-block style={{padding:"0 44px 6px"}}>
               <h2 style={rH2}>1.3 Entwicklungstendenz der Klimaeinflüsse (RCP 2.6 &amp; RCP 8.5)</h2>
               <p style={rP}>
                 Die folgende Übersicht zeigt die projizierte Entwicklungstendenz der zentralen Klimaeinflüsse
@@ -14093,8 +14453,92 @@ function GesamtberichtModal({region,dwd,destatis,gerics,szenario,zeithorizont,ge
               <KlimaeinflussTabelle/>
             </div>
 
+            {/* ===== 1.4 Räumliches Lagebild (Karte + Kreisvergleich) ===== */}
+            <div data-pdf-block style={{padding:"0 44px 6px"}}>
+              <h2 style={rH2}>1.4 Räumliches Lagebild – {region?region.name:"Saarland"} im Saarlandvergleich</h2>
+              <p style={rP}>
+                Die Karte zeigt die erwartete Zahl heißer Tage in der nahen Zukunft (2021–2050,
+                Szenario {lageSzKurz}) je Kreisgebiet – kreisscharf nach den GERICS-Klimaausblicken,
+                auf amtlichen Verwaltungsgrenzen (VG250). {eigenKreis5 && <>Das Analysegebiet ist blau
+                umrandet.</>} Die anschließende Tabelle stellt die zentralen Kennwerte aller sechs
+                Kreisgebiete gegenüber.
+              </p>
+              <div style={{display:"grid",gridTemplateColumns:"300px 1fr",gap:22,alignItems:"center",
+                margin:"2px 0 10px"}}>
+                <div>
+                  <ReportSaarKarte modus="choropleth" hervorAgs5={eigenKreis5}
+                    fills={lageFills} labels={lageLabels} breite={300}/>
+                  <div style={{marginTop:8}}>
+                    <div style={{height:10,borderRadius:5,
+                      background:"linear-gradient(90deg,"+mischFarbe("#f2ede3","#c5462f",0.08)+",#c5462f)"}}/>
+                    <div style={{display:"flex",justifyContent:"space-between",fontSize:8.5,
+                      color:"var(--ink-soft)",marginTop:2}}>
+                      <span>{deZahl(lageWMin,0)}</span>
+                      <span>Heiße Tage/Jahr 2021–2050 ({lageSzKurz}, Median)</span>
+                      <span>{deZahl(lageWMax,0)}</span>
+                    </div>
+                  </div>
+                </div>
+                <div style={{fontSize:11.5,lineHeight:1.6,color:"var(--ink)",textAlign:"justify"}}>
+                  {lageText[0]}
+                </div>
+              </div>
+              {lageText.slice(1).map((t,i)=><p key={i} style={rP}>{t}</p>)}
+            </div>
+            <div data-pdf-block style={{padding:"0 44px 20px"}}>
+              <h3 style={rH3}>Kreisvergleich der klimatischen Kennwerte (GERICS, kreisscharf)</h3>
+              <table style={{width:"100%",borderCollapse:"collapse",fontSize:10.5,marginBottom:6}}>
+                <thead><tr style={{borderBottom:"2px solid var(--line)"}}>
+                  <th style={rTh}>Kreisgebiet</th>
+                  {/* Kopfzeilen vor-uppercased: text-transform:uppercase + "ß" löst einen
+                      html2canvas-Range-Bug aus (SS verlängert den Text um ein Zeichen) */}
+                  <th style={{...rTh,textAlign:"right"}}>MITTELTEMP. (°C)</th>
+                  <th style={{...rTh,textAlign:"right"}}>HEISSE TAGE</th>
+                  <th style={{...rTh,textAlign:"right"}}>SOMMERTAGE</th>
+                  <th style={{...rTh,textAlign:"right"}}>STARKREGENTAGE</th>
+                  <th style={{...rTh,textAlign:"right"}}>NIEDERSCHLAG (mm)</th>
+                  <th style={{...rTh,textAlign:"right"}}>Δ TEMP. 2021–2050</th>
+                  <th style={{...rTh,textAlign:"right"}}>Δ HEISSE TAGE</th></tr></thead>
+                <tbody>
+                  {lage.kreise.map(k=>{
+                    const eigen=k.ags===eigenKreis5;
+                    const tdS=eigen?{...rTd,fontWeight:700,background:"var(--ifas-blue-soft)"}:rTd;
+                    return (
+                      <tr key={k.ags} style={{borderBottom:"1px solid var(--line-soft)"}}>
+                        <td style={tdS}>{k.name}{eigen?" ◀":""}</td>
+                        <td style={{...tdS,textAlign:"right"}}>{deZahl(k.t,1)}</td>
+                        <td style={{...tdS,textAlign:"right"}}>{deZahl(k.ht,0)}</td>
+                        <td style={{...tdS,textAlign:"right"}}>{deZahl(k.st,0)}</td>
+                        <td style={{...tdS,textAlign:"right"}}>{deZahl(k.nsr,1)}</td>
+                        <td style={{...tdS,textAlign:"right"}}>{deZahl(k.nsj,0)}</td>
+                        <td style={{...tdS,textAlign:"right"}}>+{deZahl(k.dT,1)} °C</td>
+                        <td style={{...tdS,textAlign:"right"}}>+{deZahl(k.dHt,0)}</td>
+                      </tr>
+                    );
+                  })}
+                  <tr style={{background:"var(--ifas-green-soft)",fontWeight:700}}>
+                    <td style={rTd}>Saarland (Flächenmittel)</td>
+                    <td style={{...rTd,textAlign:"right"}}>{deZahl(lage.land.t,1)}</td>
+                    <td style={{...rTd,textAlign:"right"}}>{deZahl(lage.land.ht,1)}</td>
+                    <td style={{...rTd,textAlign:"right"}}>{deZahl(lage.land.st,0)}</td>
+                    <td style={{...rTd,textAlign:"right"}}>{deZahl(lage.land.starkregentage,1)}</td>
+                    <td style={{...rTd,textAlign:"right"}}>{deZahl(lage.land.niederschlag_jahr,0)}</td>
+                    <td style={{...rTd,textAlign:"right"}}>+{deZahl(lage.land.dT,1)} °C</td>
+                    <td style={{...rTd,textAlign:"right"}}>+{deZahl(lage.land.dHt,0)}</td>
+                  </tr>
+                </tbody>
+              </table>
+              <div style={{fontSize:9.5,color:"var(--ink-mute)",lineHeight:1.45}}>
+                Referenz 1971–2000 (DWD HYRAS); Projektion: Median der nahen Zukunft 2021–2050 im
+                Szenario {lageSzKurz} (GERICS Klimaausblicke, EURO-CORDEX/ReKliEs-De).
+                Verwaltungsgrenzen: VG250 © GeoBasis-DE/BKG (dl-de/by-2-0), vereinfacht.
+                {eigenKreis5 && " ◀ = Analysegebiet dieser Dokumentation."}
+              </div>
+            </div>
+
             {/* ========== 2 KLIMARISIKOANALYSE ========== */}
-            <div data-pdf-block style={{padding:"8px 44px 20px"}}>
+            <div data-pdf-block data-pdf-chapter="2 – Ergebnisse der Klimarisikoanalyse"
+              style={{padding:"8px 44px 6px"}}>
               <h1 style={rH1}>2 – Ergebnisse der Klimarisikoanalyse</h1>
               <h2 style={rH2}>2.1 Methodik</h2>
               <p style={rP}>
@@ -14146,6 +14590,8 @@ function GesamtberichtModal({region,dwd,destatis,gerics,szenario,zeithorizont,ge
                 Anpassungskapazität aktuell am niedrigsten eingeschätzt wird (AK {akRank[0].ak>0?"+":""}{akRank[0].ak}).</>}
               </Erkenntnis>
 
+            </div>
+            <div data-pdf-block style={{padding:"0 44px 0"}}>
               <h2 style={rH2}>2.3 Klimarisiko ohne Anpassung</h2>
               <p style={rP}>
                 Die folgende Übersicht weist das Klimarisiko <strong>ohne Anpassung</strong> je Klimawirkung
@@ -14155,8 +14601,10 @@ function GesamtberichtModal({region,dwd,destatis,gerics,szenario,zeithorizont,ge
                 pessimistischen (RCP 8.5) Pfad – analog zu den Steckbriefen des Web-Tools.
               </p>
               <h3 style={rH3}>Übergeordnetes Risikoprofil der Handlungsfelder</h3>
-              {CLUSTERS.map(c=>(
-                <div key={c.id} style={{marginBottom:14}}>
+            </div>
+            {CLUSTERS.map(c=>(
+              <div key={"rp"+c.id} data-pdf-block style={{padding:"0 44px",marginBottom:0}}>
+                <div style={{marginBottom:14}}>
                   <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}>
                     <span style={{display:"inline-block",width:10,height:10,borderRadius:2,background:c.color}}/>
                     <strong style={{fontSize:11.5,color:"var(--ink)"}}>{c.name}</strong>
@@ -14164,7 +14612,9 @@ function GesamtberichtModal({region,dwd,destatis,gerics,szenario,zeithorizont,ge
                   <RisikoTabelleDoku wirkungen={c.wirkungen} dwd={dwd} gerics={gerics}
                     region={region} gefValues={gefMap[c.id]||{}} kompakt/>
                 </div>
-              ))}
+              </div>
+            ))}
+            <div data-pdf-block style={{padding:"0 44px 20px"}}>
               <div style={{fontSize:9.5,color:"var(--ink-mute)",marginTop:2,lineHeight:1.45}}>
                 Klimarisiko <strong>ohne Anpassung</strong>, je Klimawirkung aus dem treibenden Klimaeinfluss
                 abgeleitet. RCP 2.6 = optimistisch, RCP 8.5 = pessimistisch; das Klimasignal nimmt zum Ende
@@ -14179,40 +14629,47 @@ function GesamtberichtModal({region,dwd,destatis,gerics,szenario,zeithorizont,ge
               const ausgeschl=sichtbareHF(c.id)
                 .filter(h=>relevanzStatus(hfRelevanz,h.id)==="nicht");
               return (
-                <div key={c.id} data-pdf-block style={{padding:"10px 44px 16px"}}>
-                  <div style={{display:"flex",alignItems:"center",gap:9,marginBottom:4,
-                    borderLeft:"4px solid "+c.color,paddingLeft:11}}>
-                    <h2 style={{fontFamily:"'Lora',serif",fontSize:14.5,fontWeight:600,color:"var(--ink)",margin:0}}>
-                      2.4.{ci+1} {c.name}</h2>
-                    <span style={{fontSize:10.5,color:"var(--ink-soft)",marginLeft:"auto"}}>
-                      Risiko <strong style={{color:risiken[ci].hex}}>{risiken[ci].label}</strong></span>
+                <React.Fragment key={c.id}>
+                  <div data-pdf-block style={{padding:"10px 44px 0"}}>
+                    <div style={{display:"flex",alignItems:"center",gap:9,marginBottom:4,
+                      borderLeft:"4px solid "+c.color,paddingLeft:11}}>
+                      <h2 style={{fontFamily:"'Lora',serif",fontSize:14.5,fontWeight:600,color:"var(--ink)",margin:0}}>
+                        2.4.{ci+1} {c.name}</h2>
+                      <span style={{fontSize:10.5,color:"var(--ink-soft)",marginLeft:"auto"}}>
+                        Risiko <strong style={{color:risiken[ci].hex}}>{risiken[ci].label}</strong></span>
+                    </div>
+                    {SAAR_CLUSTER_TEXT[c.id] &&
+                      <p style={{...rP,paddingLeft:11,fontSize:11}}>{SAAR_CLUSTER_TEXT[c.id]}</p>}
+                    {hfs.length===0 && (
+                      <div style={{paddingLeft:11,fontSize:10.5,color:"var(--ink-soft)",fontStyle:"italic"}}>
+                        Keine gesetzlichen Unter-Handlungsfelder; Bewertung erfolgt auf Cluster-Ebene (siehe oben).
+                      </div>
+                    )}
                   </div>
-                  {SAAR_CLUSTER_TEXT[c.id] &&
-                    <p style={{...rP,paddingLeft:11,fontSize:11}}>{SAAR_CLUSTER_TEXT[c.id]}</p>}
-                  {hfs.length>0 ? hfs.map(hf=>(
-                    <div key={hf.id} style={{margin:"10px 0 0",paddingLeft:11}}>
-                      <div style={{fontSize:11.5,fontWeight:700,color:"var(--ifas-blue-dark)"}}>
-                        {hf.code ? hf.code+" – " : ""}{hf.name}</div>
-                      {hf.tagline && <div style={{fontSize:10,color:"var(--ink-soft)",margin:"1px 0 3px"}}>{hf.tagline}</div>}
-                      {SAAR_HF_TEXT[hf.id] && <div style={{fontSize:10,color:"var(--ink)",
-                        margin:"0 0 5px",fontStyle:"italic"}}>Saarland: {SAAR_HF_TEXT[hf.id]}</div>}
-                      <RisikoTabelleDoku wirkungen={hf.wirkungen} dwd={dwd} gerics={gerics}
-                        region={region} gefValues={(hfGefMapSz && hfGefMapSz[hf.id])||{}} kompakt/>
+                  {hfs.map(hf=>(
+                    <div key={hf.id} data-pdf-block style={{padding:"0 44px"}}>
+                      <div style={{margin:"6px 0 0",paddingLeft:11}}>
+                        <div style={{fontSize:11.5,fontWeight:700,color:"var(--ifas-blue-dark)"}}>
+                          {hf.code ? hf.code+" – " : ""}{hf.name}</div>
+                        {hf.tagline && <div style={{fontSize:10,color:"var(--ink-soft)",margin:"1px 0 3px"}}>{hf.tagline}</div>}
+                        {SAAR_HF_TEXT[hf.id] && <div style={{fontSize:10,color:"var(--ink)",
+                          margin:"0 0 5px",fontStyle:"italic"}}>Saarland: {SAAR_HF_TEXT[hf.id]}</div>}
+                        <RisikoTabelleDoku wirkungen={hf.wirkungen} dwd={dwd} gerics={gerics}
+                          region={region} gefValues={(hfGefMapSz && hfGefMapSz[hf.id])||{}} kompakt/>
+                      </div>
                     </div>
-                  )) : (
-                    <div style={{paddingLeft:11,fontSize:10.5,color:"var(--ink-soft)",fontStyle:"italic"}}>
-                      Keine gesetzlichen Unter-Handlungsfelder; Bewertung erfolgt auf Cluster-Ebene (siehe oben).
-                    </div>
-                  )}
+                  ))}
                   {ausgeschl.length>0 && (
-                    <div style={{paddingLeft:11,marginTop:8,fontSize:9.5,color:"var(--ink-mute)",lineHeight:1.5}}>
-                      Im Relevanz-Screening ausgeschlossen:{" "}
-                      {ausgeschl.map(h=>h.code+" – "+h.name+
-                        ((hfRelevanz?.[h.id]?.begruendung||"").trim()
-                          ? " (Begründung: "+hfRelevanz[h.id].begruendung.trim()+")" : "")).join("; ")}.
+                    <div data-pdf-block style={{padding:"0 44px"}}>
+                      <div style={{paddingLeft:11,marginTop:4,fontSize:9.5,color:"var(--ink-mute)",lineHeight:1.5}}>
+                        Im Relevanz-Screening ausgeschlossen:{" "}
+                        {ausgeschl.map(h=>h.code+" – "+h.name+
+                          ((hfRelevanz?.[h.id]?.begruendung||"").trim()
+                            ? " (Begründung: "+hfRelevanz[h.id].begruendung.trim()+")" : "")).join("; ")}.
+                      </div>
                     </div>
                   )}
-                </div>
+                </React.Fragment>
               );
             })}
 
@@ -14245,7 +14702,8 @@ function GesamtberichtModal({region,dwd,destatis,gerics,szenario,zeithorizont,ge
             </div>
 
             {/* ========== 3 METHODIK & DATENGRUNDLAGE ========== */}
-            <div data-pdf-block style={{padding:"8px 44px 20px"}}>
+            <div data-pdf-block data-pdf-chapter="3 – Methodik und Datengrundlage"
+              style={{padding:"8px 44px 6px"}}>
               <h1 style={rH1}>3 – Methodik und Datengrundlage</h1>
               <h2 style={rH2}>3.1 Methodischer Rahmen</h2>
               <p style={rP}>
@@ -14266,6 +14724,8 @@ function GesamtberichtModal({region,dwd,destatis,gerics,szenario,zeithorizont,ge
                 Exposition- und Sensitivitätswerte sind fachlich überschreibbare Startwerte, keine Messgrößen
                 – ihre Validierung durch Fachakteure ist Teil des Verfahrens.
               </p>
+            </div>
+            <div data-pdf-block style={{padding:"0 44px 20px"}}>
               <h2 style={rH2}>3.3 Klimaszenarien und Umgang mit RCP 8.5</h2>
               <p style={rP}>
                 Die Strategie betrachtet mehrere Emissionspfade. Neben einem moderaten Szenario (RCP 4.5)
@@ -14312,7 +14772,8 @@ function GesamtberichtModal({region,dwd,destatis,gerics,szenario,zeithorizont,ge
             </div>
 
             {/* ========== 4 GESAMTSTRATEGIE & MASSNAHMEN ========== */}
-            <div data-pdf-block style={{padding:"8px 44px 14px"}}>
+            <div data-pdf-block data-pdf-chapter="4 – Gesamtstrategie und Maßnahmenkatalog"
+              style={{padding:"8px 44px 14px"}}>
               <h1 style={rH1}>4 – Gesamtstrategie und Maßnahmenkatalog</h1>
               <h2 style={rH2}>4.1 Strategischer Rahmen</h2>
               <p style={rP}>
@@ -14340,21 +14801,23 @@ function GesamtberichtModal({region,dwd,destatis,gerics,szenario,zeithorizont,ge
               if(ms.length===0) return null;
               const rc=riskClassByIdx(clusterScores[c.id]);
               return (
-                <div key={c.id} data-pdf-block style={{padding:"10px 44px 14px"}}>
-                  <div style={{display:"flex",alignItems:"center",gap:9,marginBottom:4,
-                    borderLeft:"4px solid "+c.color,paddingLeft:11}}>
-                    <h2 style={{fontFamily:"'Lora',serif",fontSize:14.5,fontWeight:600,color:"var(--ink)",margin:0}}>{c.name}</h2>
-                    <span style={{fontSize:10.5,color:"var(--ink-soft)",marginLeft:"auto"}}>
-                      Risiko <strong style={{color:rc.hex}}>{rc.label}</strong> – {ms.length} Maßnahmen</span>
+                <React.Fragment key={c.id}>
+                  <div data-pdf-block style={{padding:"10px 44px 0"}}>
+                    <div style={{display:"flex",alignItems:"center",gap:9,marginBottom:4,
+                      borderLeft:"4px solid "+c.color,paddingLeft:11}}>
+                      <h2 style={{fontFamily:"'Lora',serif",fontSize:14.5,fontWeight:600,color:"var(--ink)",margin:0}}>{c.name}</h2>
+                      <span style={{fontSize:10.5,color:"var(--ink-soft)",marginLeft:"auto"}}>
+                        Risiko <strong style={{color:rc.hex}}>{rc.label}</strong> – {ms.length} Maßnahmen</span>
+                    </div>
+                    <div style={{fontSize:10.5,color:"var(--ink-soft)",margin:"0 0 3px",paddingLeft:11,lineHeight:1.45}}>
+                      {c.tagline}
+                    </div>
                   </div>
-                  <div style={{fontSize:10.5,color:"var(--ink-soft)",margin:"0 0 9px",paddingLeft:11,lineHeight:1.45}}>
-                    {c.tagline}
-                  </div>
-                  <div style={{display:"flex",flexDirection:"column",gap:8}}>
-                    {ms.map(m=>{ const st=STATUS_BY_ID[m.statusSel]; const bw=BEWERTUNG_BY_ID[m.bewertungSel];
-                      return (
-                      <div key={m.id} style={{border:"1px solid var(--line)",borderRadius:8,
-                        padding:"10px 13px",breakInside:"avoid",pageBreakInside:"avoid"}}>
+                  {ms.map(m=>{ const st=STATUS_BY_ID[m.statusSel]; const bw=BEWERTUNG_BY_ID[m.bewertungSel];
+                    return (
+                    <div key={m.id} data-pdf-block style={{padding:"0 44px"}}>
+                      <div style={{border:"1px solid var(--line)",borderRadius:8,
+                        padding:"10px 13px",marginTop:6}}>
                         <div style={{display:"flex",alignItems:"baseline",gap:8,flexWrap:"wrap"}}>
                           <span style={{fontSize:9.5,fontWeight:700,color:"var(--ink-soft)"}}>{m.nr}</span>
                           <span style={{fontSize:12,fontWeight:700,color:"var(--ink)",flex:1}}>{m.titel}</span>
@@ -14374,14 +14837,15 @@ function GesamtberichtModal({region,dwd,destatis,gerics,szenario,zeithorizont,ge
                           <strong>Förderung:</strong> {m.foerderung}</div>}
                         {m.quelle && <div style={{fontSize:9.5,color:"var(--ink-soft)",marginTop:2}}>
                           <strong>Quelle:</strong> {m.quelle}</div>}
-                      </div>); })}
-                  </div>
-                </div>
+                      </div>
+                    </div>); })}
+                </React.Fragment>
               );
             })}
 
-            {/* ========== 4 UMSETZUNG & VERSTETIGUNG ========== */}
-            <div data-pdf-block style={{padding:"10px 44px 20px"}}>
+            {/* ========== 5 UMSETZUNG & VERSTETIGUNG ========== */}
+            <div data-pdf-block data-pdf-chapter="5 – Umsetzung, Monitoring und Verstetigung"
+              style={{padding:"10px 44px 20px"}}>
               <h1 style={rH1}>5 – Umsetzung, Monitoring und Verstetigung</h1>
               <p style={rP}>
                 Die Wirksamkeit der Strategie hängt von der konsequenten Umsetzung und einem belastbaren
