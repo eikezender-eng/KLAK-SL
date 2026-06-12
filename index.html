@@ -9,6 +9,12 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<!-- Experience-Layer: GSAP für Timeline-/Stagger-Animationen, three.js für den
+     Partikelraum des Einstiegs. Beide optional: Fällt das Laden aus, degradiert
+     die Anwendung auf CSS-Animationen bzw. einen 2D-Canvas-Fallback. -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.149.0/three.min.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -700,6 +706,126 @@
     .app-body{padding:20px;}
     .app-header{padding:0 18px;height:auto;flex-wrap:wrap;gap:10px;padding-top:12px;padding-bottom:12px;}
   }
+  /* ============================================================
+     EXPERIENCE-LAYER – Motion-System & Hero
+     Mikro-Animationen (CSS) + GSAP-Choreografie (JS). Sämtliche
+     Bewegung respektiert prefers-reduced-motion (s. u.) und endet
+     in neutralen Transform-Zuständen (html2canvas-/PDF-sicher).
+     ============================================================ */
+  :root{ --ease-out:cubic-bezier(.22,1,.36,1); }
+
+  /* Tab-Übergänge: jeder Reiterwechsel blendet den Inhalt choreografiert ein */
+  .tab{position:relative;}
+  .tab:not(.active):hover{transform:translateY(-1px);}
+  .tab-panel{animation:tabIn .45s var(--ease-out) both;}
+  @keyframes tabIn{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
+  /* Abschnitte der jeweiligen Ansicht (eine Wrapper-Ebene tiefer) staffeln nach */
+  .tab-panel>*>*{animation:riseIn .55s var(--ease-out) both;}
+  .tab-panel>*>*:nth-child(1){animation-delay:.03s}
+  .tab-panel>*>*:nth-child(2){animation-delay:.09s}
+  .tab-panel>*>*:nth-child(3){animation-delay:.15s}
+  .tab-panel>*>*:nth-child(4){animation-delay:.21s}
+  .tab-panel>*>*:nth-child(5){animation-delay:.27s}
+  .tab-panel>*>*:nth-child(6){animation-delay:.32s}
+  .tab-panel>*>*:nth-child(n+7){animation-delay:.36s}
+  @keyframes riseIn{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+
+  /* Hover-Mikrointeraktionen */
+  .card{transition:transform .25s var(--ease-out),box-shadow .25s var(--ease-out);}
+  .card:hover{transform:translateY(-2px);box-shadow:var(--shadow-lg);}
+  .data-card{transition:transform .22s var(--ease-out),box-shadow .22s var(--ease-out);}
+  .data-card:hover{transform:translateY(-2px);box-shadow:var(--shadow-md);}
+  .dc-value{animation:popIn .55s var(--ease-out) both;}
+  @keyframes popIn{from{opacity:0;transform:scale(.94)}to{opacity:1;transform:none}}
+  .btn-primary{transition:transform .2s var(--ease-out),box-shadow .2s,filter .2s;}
+  .btn-primary:hover{transform:translateY(-1px);box-shadow:0 6px 18px rgba(0,80,160,.30);}
+  .btn-primary:active{transform:translateY(0) scale(.98);}
+  .proj-btn,.snap-btn{transition:transform .18s var(--ease-out),box-shadow .18s,background .18s,border-color .18s;}
+  .proj-btn:hover,.snap-btn:hover{transform:translateY(-1px);}
+
+  /* Modale: federnder Auftritt */
+  .modal-overlay{animation:overlayIn .25s ease both;}
+  .modal-card{animation:modalIn .42s var(--ease-out) both;}
+  @keyframes overlayIn{from{opacity:0}to{opacity:1}}
+  @keyframes modalIn{from{opacity:0;transform:translateY(26px) scale(.97)}to{opacity:1;transform:none}}
+
+  /* Header-Entrance */
+  .app-header{animation:headerIn .55s var(--ease-out) both;}
+  @keyframes headerIn{from{transform:translateY(-100%)}to{transform:none}}
+
+  /* Ladebildschirm */
+  .load-outline path{stroke-dasharray:6 7;animation:landDash 2.8s linear infinite;}
+  @keyframes landDash{to{stroke-dashoffset:-26;}}
+  .progress-shimmer{position:relative;overflow:hidden;}
+  .progress-shimmer::after{content:"";position:absolute;inset:0;
+    background:linear-gradient(90deg,transparent,rgba(255,255,255,.5),transparent);
+    transform:translateX(-100%);animation:shimmer 1.5s infinite;}
+  @keyframes shimmer{to{transform:translateX(100%)}}
+  .step-running{animation:stepPulse 1.4s ease-in-out infinite;}
+  @keyframes stepPulse{0%,100%{box-shadow:0 0 0 0 rgba(0,80,160,.16)}50%{box-shadow:0 0 0 7px rgba(0,80,160,.05)}}
+
+  /* ---------- HERO (Einstieg / Gebietswahl) ---------- */
+  .hero{position:relative;min-height:calc(100vh - 78px - 92px);overflow:hidden;
+    display:flex;align-items:center;justify-content:center;padding:56px 28px;
+    background:radial-gradient(ellipse 95% 75% at 72% -12%,#15406e 0%,#0a2547 46%,#061830 100%);}
+  .hero-canvas{position:absolute;inset:0;width:100%;height:100%;display:block;}
+  .hero-aurora{position:absolute;border-radius:50%;filter:blur(90px);pointer-events:none;
+    mix-blend-mode:screen;will-change:transform;}
+  .hero-aurora.a1{width:560px;height:560px;background:#0a5ab4;top:-170px;left:-130px;opacity:.5;
+    animation:aurora 17s ease-in-out infinite alternate;}
+  .hero-aurora.a2{width:480px;height:480px;background:#1c8a32;bottom:-190px;right:-110px;opacity:.26;
+    animation:aurora 21s ease-in-out -5s infinite alternate;}
+  .hero-aurora.a3{width:380px;height:380px;background:#3478b8;top:32%;left:56%;opacity:.30;
+    animation:aurora 25s ease-in-out -11s infinite alternate;}
+  @keyframes aurora{from{transform:translate3d(0,0,0) scale(1)}to{transform:translate3d(70px,46px,0) scale(1.16)}}
+  .hero-inner{position:relative;max-width:1140px;width:100%;z-index:2;}
+  .hero-eyebrow{font-size:11px;font-weight:700;letter-spacing:.22em;text-transform:uppercase;
+    color:#8fd49a;display:flex;align-items:center;gap:10px;}
+  .hero-eyebrow::before{content:"";width:30px;height:2px;background:#8fd49a;border-radius:2px;}
+  .hero-title{font-family:'Lora',serif;font-weight:700;color:#fff;
+    font-size:clamp(34px,5.2vw,58px);line-height:1.07;letter-spacing:-.015em;margin:16px 0 18px;}
+  .hero-title .line{display:block;overflow:hidden;padding-bottom:.06em;margin-bottom:-.06em;}
+  .hero-title .w{display:inline-block;will-change:transform;}
+  .hero-grad{background:linear-gradient(92deg,#8fd49a,#5aa9e8 55%,#9ec3e8);
+    -webkit-background-clip:text;background-clip:text;color:transparent;}
+  .hero-sub{max-width:660px;color:rgba(222,234,247,.84);font-size:14.5px;line-height:1.65;}
+  .hero-grid{display:grid;grid-template-columns:minmax(320px,1.04fr) minmax(320px,1fr);
+    gap:26px;margin-top:36px;align-items:stretch;}
+  @media(max-width:900px){.hero-grid{grid-template-columns:1fr;}}
+  .glass{background:rgba(9,30,56,.58);border:1px solid rgba(158,195,232,.18);border-radius:18px;
+    backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+    box-shadow:0 24px 60px rgba(2,12,26,.45);padding:22px 22px 18px;}
+  .hero-panel-label{font-size:10.5px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;
+    color:#9ec3e8;margin-bottom:12px;display:flex;gap:8px;align-items:center;}
+  .hero-row{display:flex;justify-content:space-between;align-items:center;gap:10px;width:100%;
+    padding:11px 14px;border-radius:11px;border:1px solid transparent;cursor:pointer;text-align:left;
+    color:#eaf2fb;background:transparent;
+    transition:background .2s,border-color .2s,transform .25s var(--ease-out);}
+  .hero-row:hover,.hero-row.hov{background:rgba(158,195,232,.10);
+    border-color:rgba(158,195,232,.26);transform:translateX(5px);}
+  .hero-row:focus-visible{outline:2px solid #8fd49a;outline-offset:2px;}
+  .hero-row .hr-name{font-size:13.5px;font-weight:600;display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+  .hero-row .hr-sub{font-size:10.5px;color:rgba(190,210,232,.68);margin-top:2px;line-height:1.4;}
+  .hero-row .hr-type{font-size:9px;font-weight:700;letter-spacing:.07em;color:#9ec3e8;
+    border:1px solid rgba(158,195,232,.35);border-radius:999px;padding:3px 9px;flex-shrink:0;}
+  .hero-row-land{border:1px solid rgba(143,212,154,.45);background:rgba(32,160,48,.13);margin-bottom:10px;}
+  .hero-row-land:hover{background:rgba(32,160,48,.22);border-color:rgba(143,212,154,.7);transform:translateX(5px);}
+  .hero-badge{font-size:8.5px;font-weight:800;letter-spacing:.05em;border-radius:4px;padding:2px 6px;}
+  .hero-badge.gerics{background:rgba(32,160,48,.28);color:#a8e6b4;}
+  .hero-badge.land{background:#20a030;color:#fff;}
+  .hero-map-svg path{transition:fill .22s;}
+  .hero-map-hint{min-height:38px;font-size:11px;color:rgba(190,210,232,.78);
+    text-align:center;margin-top:9px;line-height:1.55;}
+  .hero-foot{margin-top:28px;font-size:10.5px;color:rgba(170,195,222,.55);
+    display:flex;gap:18px;flex-wrap:wrap;}
+
+  /* Bewegung respektiert die Systemeinstellung */
+  @media (prefers-reduced-motion: reduce){
+    *,*::before,*::after{
+      animation-duration:.001s!important;animation-delay:0s!important;
+      animation-iteration-count:1!important;transition-duration:.001s!important;}
+  }
+
   @media print{
     .app-header,.app-footer,.tab-bar,.no-print{display:none!important;}
     .app-body{padding:0;max-width:100%;}
@@ -710,6 +836,121 @@
 <div id="root"></div>
 <script type="text/babel" data-presets="react">
 const {useState,useEffect,useRef,useMemo} = React;
+
+/* ============================================================
+   EXPERIENCE-LAYER – Motion-Helfer
+   GSAP und three.js sind optionale Verstärker: Ohne sie (oder bei
+   prefers-reduced-motion) degradiert alles auf CSS bzw. statisch.
+   ============================================================ */
+const MOTION_OK=()=>!(window.matchMedia&&window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+const GSAP_OK=()=>MOTION_OK()&&!!window.gsap;
+
+/* Atmosphärischer Partikelraum hinter dem Hero.
+   Primär three.js (WebGL, Tiefenstaffelung + Maus-Parallaxe),
+   Fallback: 2D-Canvas mit driftenden Leuchtpunkten. */
+function HeroBackdrop(){
+  const ref=useRef(null);
+  useEffect(()=>{
+    const canvas=ref.current;
+    if(!canvas||!MOTION_OK()) return;
+    let raf=0, stop=false, cleanup=null;
+    const parent=canvas.parentElement;
+    const size=()=>({w:parent.clientWidth||window.innerWidth,h:parent.clientHeight||640});
+
+    // ---- three.js-Pfad ----
+    if(window.THREE){
+      try{
+        const THREE=window.THREE;
+        const {w,h}=size();
+        const renderer=new THREE.WebGLRenderer({canvas,alpha:true,antialias:true});
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,2));
+        renderer.setSize(w,h,false);
+        const scene=new THREE.Scene();
+        const cam=new THREE.PerspectiveCamera(58,w/h,1,1200);
+        cam.position.z=300;
+        const N=850;
+        const pos=new Float32Array(N*3), col=new Float32Array(N*3);
+        const palette=[new THREE.Color("#5aa9e8"),new THREE.Color("#9ec3e8"),
+          new THREE.Color("#8fd49a"),new THREE.Color("#2f6fb4")];
+        for(let i=0;i<N;i++){
+          pos[i*3]  =(Math.random()-.5)*1100;
+          pos[i*3+1]=(Math.random()-.5)*620;
+          pos[i*3+2]=(Math.random()-.5)*520;
+          const c=palette[Math.random()<.16?2:(Math.random()*3|0)];
+          col[i*3]=c.r; col[i*3+1]=c.g; col[i*3+2]=c.b;
+        }
+        const geo=new THREE.BufferGeometry();
+        geo.setAttribute("position",new THREE.BufferAttribute(pos,3));
+        geo.setAttribute("color",new THREE.BufferAttribute(col,3));
+        const mat=new THREE.PointsMaterial({size:2.4,vertexColors:true,transparent:true,
+          opacity:.75,sizeAttenuation:true,depthWrite:false});
+        const points=new THREE.Points(geo,mat);
+        scene.add(points);
+        let tx=0,ty=0;
+        const onMove=(e)=>{
+          const r=parent.getBoundingClientRect();
+          tx=((e.clientX-r.left)/r.width-.5);
+          ty=((e.clientY-r.top)/r.height-.5);
+        };
+        const onResize=()=>{
+          const s=size();
+          renderer.setSize(s.w,s.h,false);
+          cam.aspect=s.w/s.h; cam.updateProjectionMatrix();
+        };
+        window.addEventListener("mousemove",onMove,{passive:true});
+        window.addEventListener("resize",onResize);
+        const loop=()=>{
+          if(stop) return;
+          points.rotation.y+=.00045;
+          points.rotation.x+=(ty*.14-points.rotation.x)*.04;
+          points.rotation.z+=(tx*.10-points.rotation.z)*.04;
+          renderer.render(scene,cam);
+          raf=requestAnimationFrame(loop);
+        };
+        loop();
+        cleanup=()=>{
+          stop=true; cancelAnimationFrame(raf);
+          window.removeEventListener("mousemove",onMove);
+          window.removeEventListener("resize",onResize);
+          geo.dispose(); mat.dispose(); renderer.dispose();
+        };
+        return cleanup;
+      }catch(e){ /* WebGL nicht verfügbar → 2D-Fallback */ }
+    }
+
+    // ---- 2D-Canvas-Fallback ----
+    const ctx=canvas.getContext("2d");
+    if(!ctx) return;
+    let {w,h}=size();
+    const dpr=Math.min(window.devicePixelRatio||1,2);
+    const fit=()=>{ ({w,h}=size()); canvas.width=w*dpr; canvas.height=h*dpr;
+      ctx.setTransform(dpr,0,0,dpr,0,0); };
+    fit();
+    const P=Array.from({length:110},()=>({
+      x:Math.random()*w, y:Math.random()*h, r:Math.random()*1.8+.6,
+      vx:(Math.random()-.5)*.22, vy:(Math.random()-.5)*.18,
+      c:Math.random()<.18?"143,212,154":"122,170,222", a:Math.random()*.5+.2,
+    }));
+    const onResize=()=>fit();
+    window.addEventListener("resize",onResize);
+    const loop=()=>{
+      if(stop) return;
+      ctx.clearRect(0,0,w,h);
+      P.forEach(p=>{
+        p.x+=p.vx; p.y+=p.vy;
+        if(p.x<-10)p.x=w+10; if(p.x>w+10)p.x=-10;
+        if(p.y<-10)p.y=h+10; if(p.y>h+10)p.y=-10;
+        ctx.beginPath(); ctx.arc(p.x,p.y,p.r,0,Math.PI*2);
+        ctx.fillStyle="rgba("+p.c+","+p.a+")"; ctx.fill();
+      });
+      raf=requestAnimationFrame(loop);
+    };
+    loop();
+    return ()=>{ stop=true; cancelAnimationFrame(raf);
+      window.removeEventListener("resize",onResize); };
+  },[]);
+  return <canvas ref={ref} className="hero-canvas" aria-hidden="true"/>;
+}
 
 /* ============================================================
    IfaS-LOGO  (SVG-Platzhalter im Hausstil – echte Datei
@@ -5577,122 +5818,139 @@ function Onboarding({onSelect}){
   };
   const hoverKreis = hoverAgs ? kreise.find(k=>k.ags===hoverAgs) : null;
 
-  const RegionRow = ({k,isLand})=>(
-    <button key={k.ags} className="result-row" onClick={()=>onSelect(k)}
+  /* GSAP-Eintrittschoreografie: Typo-Reveal über Zeilenmasken, Panels
+     staffeln nach, der Landesumriss zeichnet sich selbst, Kreise und
+     Beschriftungen blenden gestaffelt ein. Ohne GSAP: alles sofort sichtbar. */
+  const heroRef=useRef(null);
+  useEffect(()=>{
+    if(!GSAP_OK()||!heroRef.current) return;
+    const q=gsap.utils.selector(heroRef);
+    const tl=gsap.timeline({defaults:{ease:"power3.out"}});
+    tl.from(q(".hero-eyebrow"),{y:26,opacity:0,duration:.7})
+      .from(q(".hero-title .w"),{yPercent:118,duration:.95,stagger:.09,ease:"power4.out"},"-=.35")
+      .from(q(".hero-sub"),{y:18,opacity:0,duration:.6},"-=.5")
+      .from(q(".hero-panel"),{y:46,opacity:0,duration:.85,stagger:.15},"-=.3")
+      .from(q(".hero-foot"),{opacity:0,duration:.7},"-=.4");
+    const land=heroRef.current.querySelector(".hero-map-land");
+    if(land&&land.getTotalLength){
+      try{
+        const len=land.getTotalLength();
+        gsap.fromTo(land,{strokeDasharray:len,strokeDashoffset:len},
+          {strokeDashoffset:0,duration:2.4,ease:"power2.inOut",delay:.55,
+           clearProps:"strokeDasharray,strokeDashoffset"});
+      }catch(e){}
+    }
+    gsap.from(q(".hero-map-kreis"),{opacity:0,duration:.8,stagger:.07,delay:1.0});
+    gsap.from(q(".hero-map-gem"),{opacity:0,duration:1.2,delay:1.6});
+    gsap.from(q(".hero-map-label"),{opacity:0,scale:.5,transformOrigin:"50% 50%",
+      duration:.5,stagger:.08,delay:1.8,ease:"back.out(2.2)"});
+    return ()=>tl.kill();
+  },[]);
+
+  const HeroRow=({k,isLand})=>(
+    <button className={"hero-row"+(isLand?" hero-row-land":"")+(!isLand&&hoverAgs===k.ags?" hov":"")}
+      onClick={()=>onSelect(k)}
       onMouseEnter={()=>!isLand&&setHoverAgs(k.ags)}
-      onMouseLeave={()=>!isLand&&setHoverAgs(null)}
-      style={isLand?{
-        border:"1.5px solid var(--ifas-blue)",
-        background:"var(--ifas-blue-soft)",
-        borderRadius:11, marginBottom:10, padding:"14px 16px"
-      }:(hoverAgs===k.ags?{background:"var(--ifas-blue-soft)"}:{})}>
-      <span style={{display:"flex",flexDirection:"column",gap:2,textAlign:"left"}}>
-        <span style={{display:"flex",alignItems:"center",gap:8}}>
-          <strong style={{fontSize:isLand?15:14}}>{k.name}</strong>
-          {isLand && <span style={{fontSize:9,background:"var(--ifas-blue)",color:"#fff",
-            borderRadius:4,padding:"2px 7px",fontWeight:700,letterSpacing:".04em"}}>
-            LANDESEBENE</span>}
-          <span style={{fontSize:9,background:"#e6f5ec",color:"#0a5a28",
-            borderRadius:4,padding:"1px 5px",fontWeight:700}}>GERICS ✓</span>
+      onMouseLeave={()=>!isLand&&setHoverAgs(null)}>
+      <span>
+        <span className="hr-name">
+          {k.name}
+          {isLand && <span className="hero-badge land">LANDESEBENE</span>}
+          <span className="hero-badge gerics">GERICS ✓</span>
         </span>
-        <span style={{fontSize:10.5,color:"var(--ink-soft)"}}>
+        <span className="hr-sub" style={{display:"block"}}>
           {isLand
             ? "Gesamtgebiet – amtlicher Landeswert (GERICS Saarland v1.2)"
             : KREIS_INFO[k.ags]||""}
         </span>
       </span>
-      <span className="result-type">{isLand?"Land":"Kreis"}</span>
+      <span className="hr-type">{isLand?"LAND":"KREIS"}</span>
     </button>
   );
 
   return (
-    <div className="onboard">
-      <div className="onboard-card" style={{maxWidth:1020}}>
-        <div className="onboard-head">
-          <svg viewBox={"0 0 "+SAAR_GEO.viewW+" "+SAAR_GEO.viewH} aria-hidden="true"
-            style={{position:"absolute",right:-14,top:"50%",transform:"translateY(-50%)",
-              width:210,height:163,opacity:.16,pointerEvents:"none"}}>
-            <path d={SAAR_GEO.land} fill="#fff"/>
-          </svg>
-          <div className="onboard-eyebrow" style={{position:"relative"}}>Klimaanpassung Saarland</div>
-          <h1 className="onboard-title" style={{position:"relative"}}>Gebiet wählen</h1>
-          <div className="onboard-sub" style={{position:"relative"}}>
-            Auswertung für die Landesebene und die sechs saarländischen Landkreise
-            (inkl. Regionalverband Saarbrücken). Datengrundlage: GERICS-Klimaausblick
-            Saarland (v1.2, 2021) und Statistisches Amt Saarland.
+    <div className="hero" ref={heroRef}>
+      <HeroBackdrop/>
+      <div className="hero-aurora a1" aria-hidden="true"/>
+      <div className="hero-aurora a2" aria-hidden="true"/>
+      <div className="hero-aurora a3" aria-hidden="true"/>
+      <div className="hero-inner">
+        <div className="hero-eyebrow">Klimaanpassung Saarland · IfaS</div>
+        <h1 className="hero-title">
+          <span className="line"><span className="w">Klimarisiko verstehen.</span></span>
+          <span className="line"><span className="w hero-grad">Anpassung gestalten.</span></span>
+        </h1>
+        <p className="hero-sub">
+          Die Klimarisikoanalyse für das Saarland und seine sechs Kreisgebiete – mit
+          kreisscharfen GERICS-Projektionen, amtlichem Kartenmaterial und der
+          KWRA-Methodik nach DIN EN ISO 14091 (§ 10 KAnG). Wählen Sie ein Gebiet,
+          um die Analyse zu starten.
+        </p>
+        <div className="hero-grid">
+          <div className="hero-panel glass">
+            <div className="hero-panel-label"><Icon d={I.globe} size={13}/>Gebiet wählen</div>
+            {land && <HeroRow k={land} isLand/>}
+            <div style={{display:"flex",flexDirection:"column",gap:4}}>
+              {kreise.map(k=><HeroRow key={k.ags} k={k}/>)}
+            </div>
+          </div>
+          {/* Interaktive Auswahlkarte – amtliche VG250-Grenzen */}
+          <div className="hero-panel glass" style={{display:"flex",flexDirection:"column",justifyContent:"center"}}>
+            <div className="hero-panel-label"><Icon d={I.pin} size={13}/>… oder direkt auf der Karte</div>
+            <svg className="hero-map-svg" viewBox={"0 0 "+SAAR_GEO.viewW+" "+SAAR_GEO.viewH} width="100%"
+              style={{display:"block",height:"auto"}} role="group"
+              aria-label="Auswahlkarte der saarländischen Landkreise"
+              onMouseLeave={()=>setHoverAgs(null)}>
+              {SAAR_GEO.kreise.map(k=>{
+                const reg=kreise.find(x=>x.ags===k.ags);
+                const aktiv=hoverAgs===k.ags;
+                return (
+                  <path key={k.ags} d={k.d} className="hero-map-kreis"
+                    fill={aktiv?"rgba(143,212,154,.34)":"rgba(158,195,232,.12)"}
+                    stroke="rgba(255,255,255,.45)" strokeWidth="1.6"
+                    style={{cursor:"pointer"}}
+                    onMouseEnter={()=>setHoverAgs(k.ags)}
+                    onClick={()=>reg&&onSelect(reg)}>
+                    <title>{k.name}</title>
+                  </path>
+                );
+              })}
+              {/* Gemeindegrenzen als feine Orientierung (eigene Klasse:
+                  weiches Gesamt-Fade statt Teilnahme am Kreis-Stagger) */}
+              {SAAR_GEO.gemeinden.map(g=>(
+                <path key={"g"+g.ags} d={g.d} className="hero-map-gem" fill="none"
+                  stroke="rgba(255,255,255,.10)" strokeWidth="0.7" pointerEvents="none"/>
+              ))}
+              {SAAR_GEO.kreise.map(k=>(
+                <path key={"r"+k.ags} d={k.d} className="hero-map-kreis" fill="none"
+                  stroke={hoverAgs===k.ags?"#8fd49a":"rgba(255,255,255,.5)"}
+                  strokeWidth={hoverAgs===k.ags?3.2:1.6}
+                  strokeLinejoin="round" pointerEvents="none"/>
+              ))}
+              <path className="hero-map-land" d={SAAR_GEO.land} fill="none" stroke="#ffffff"
+                strokeWidth="2.8" strokeLinejoin="round" pointerEvents="none"/>
+              {SAAR_GEO.kreise.map(k=>(
+                <text key={"t"+k.ags} x={k.cx} y={k.cy} textAnchor="middle" pointerEvents="none"
+                  className="hero-map-label"
+                  fontSize="17" fontWeight="700" fill="#dce9f7"
+                  style={{paintOrder:"stroke",stroke:"rgba(6,24,48,.65)",strokeWidth:5}}>
+                  {KREIS_KURZ[k.ags]||k.name}
+                </text>
+              ))}
+            </svg>
+            <div className="hero-map-hint">
+              {hoverKreis
+                ? <><strong style={{color:"#8fd49a"}}>{hoverKreis.name}</strong>
+                    {" – "}{KREIS_INFO[hoverKreis.ags]||""}{" · "}
+                    {hoverKreis.ew.toLocaleString("de-DE")} EW – Klick öffnet die Analyse</>
+                : <span>Amtliche Verwaltungsgrenzen (VG250 © GeoBasis-DE/BKG, dl-de/by-2-0)</span>}
+            </div>
           </div>
         </div>
-        <div className="onboard-body">
-          <div className="onboard-grid">
-            <div>
-              {land && <>
-                <div className="field-label"><Icon d={I.globe} size={13}/>Landesebene</div>
-                <RegionRow k={land} isLand/>
-              </>}
-              <div className="field-label" style={{marginTop:6}}>
-                <Icon d={I.map} size={13}/>Landkreise & Regionalverband
-              </div>
-              <div className="results-list scroll-thin" style={{maxHeight:400}}>
-                {kreise.map(k=><RegionRow key={k.ags} k={k}/>)}
-              </div>
-            </div>
-            {/* Interaktive Auswahlkarte – amtliche VG250-Grenzen */}
-            <div>
-              <div className="field-label"><Icon d={I.pin} size={13}/>… oder direkt auf der Karte wählen</div>
-              <svg viewBox={"0 0 "+SAAR_GEO.viewW+" "+SAAR_GEO.viewH} width="100%"
-                style={{display:"block",height:"auto"}} role="group"
-                aria-label="Auswahlkarte der saarländischen Landkreise"
-                onMouseLeave={()=>setHoverAgs(null)}>
-                {SAAR_GEO.kreise.map(k=>{
-                  const reg=kreise.find(x=>x.ags===k.ags);
-                  const aktiv=hoverAgs===k.ags;
-                  return (
-                    <path key={k.ags} d={k.d}
-                      fill={aktiv?"#9ec3e8":"var(--ifas-blue-soft)"} stroke="#fff" strokeWidth="2"
-                      style={{cursor:"pointer",transition:"fill .15s"}}
-                      onMouseEnter={()=>setHoverAgs(k.ags)}
-                      onClick={()=>reg&&onSelect(reg)}>
-                      <title>{k.name}</title>
-                    </path>
-                  );
-                })}
-                {/* Gemeindegrenzen als feine Orientierung */}
-                {SAAR_GEO.gemeinden.map(g=>(
-                  <path key={"g"+g.ags} d={g.d} fill="none" stroke="rgba(0,80,160,.14)"
-                    strokeWidth="0.8" pointerEvents="none"/>
-                ))}
-                {SAAR_GEO.kreise.map(k=>(
-                  <path key={"r"+k.ags} d={k.d} fill="none"
-                    stroke={hoverAgs===k.ags?"var(--ifas-blue)":"#fff"}
-                    strokeWidth={hoverAgs===k.ags?3.4:2.2}
-                    strokeLinejoin="round" pointerEvents="none"/>
-                ))}
-                <path d={SAAR_GEO.land} fill="none" stroke="var(--ifas-blue-dark)" strokeWidth="2.8"
-                  strokeLinejoin="round" pointerEvents="none"/>
-                {SAAR_GEO.kreise.map(k=>(
-                  <text key={"t"+k.ags} x={k.cx} y={k.cy} textAnchor="middle" pointerEvents="none"
-                    fontSize="17" fontWeight="700" fill="var(--ifas-blue-dark)"
-                    style={{paintOrder:"stroke",stroke:"#ffffffd9",strokeWidth:5}}>
-                    {KREIS_KURZ[k.ags]||k.name}
-                  </text>
-                ))}
-              </svg>
-              <div style={{minHeight:34,marginTop:8,fontSize:11.5,lineHeight:1.45,
-                color:"var(--ink-soft)",textAlign:"center"}}>
-                {hoverKreis
-                  ? <><strong style={{color:"var(--ifas-blue-dark)"}}>{hoverKreis.name}</strong>
-                      {" – "}{KREIS_INFO[hoverKreis.ags]||""}{" · "}
-                      {hoverKreis.ew.toLocaleString("de-DE")} EW – Klick öffnet die Analyse</>
-                  : <span style={{color:"var(--ink-mute)"}}>Amtliche Verwaltungsgrenzen (VG250 © GeoBasis-DE/BKG, dl-de/by-2-0)</span>}
-              </div>
-            </div>
-          </div>
-          <div className="onboard-hint" style={{marginTop:12}}>
-            Hinweis: Die Gebietskulisse ist bewusst auf das Saarland begrenzt, weil nur
-            hierfür amtliche Klimaprojektionen kreisscharf hinterlegt sind. Die im Tool
-            angezeigten Exposition-/Sensitivitätswerte sind fachlich überschreibbare
-            Startwerte, keine Messgrößen.
-          </div>
+        <div className="hero-foot">
+          <span>Methodik: KWRA (UBA 2021) · DIN EN ISO 14091 · § 10 KAnG</span>
+          <span>Daten: GERICS-Klimaausblicke (kreisscharf) · DWD · Statistisches Amt Saarland</span>
+          <span>Exposition/Sensitivität: überschreibbare Startwerte, keine Messgrößen</span>
         </div>
       </div>
     </div>
@@ -13347,6 +13605,16 @@ function LoadingScreen({steps,progress,region}){
       background:"radial-gradient(ellipse 60% 50% at 60% 30%,rgba(0,80,160,.06),transparent)",
     }}>
       <div style={{maxWidth:480,width:"100%",textAlign:"center"}}>
+        {/* Landesumriss mit wandernder Strichlinie als Lade-Signet */}
+        <svg className="load-outline" viewBox={"0 0 "+SAAR_GEO.viewW+" "+SAAR_GEO.viewH}
+          width="120" aria-hidden="true" style={{margin:"0 auto 14px",display:"block"}}>
+          <path d={SAAR_GEO.land} fill="rgba(0,80,160,.05)" stroke="var(--ifas-blue)"
+            strokeWidth="3.4" strokeLinejoin="round"/>
+          {region?.ags && region.ags!=="10000" &&
+            SAAR_GEO.kreise.filter(k=>k.ags===String(region.ags).slice(0,5)).map(k=>(
+              <path key={k.ags} d={k.d} fill="rgba(32,160,48,.18)" stroke="none"/>
+            ))}
+        </svg>
         <div style={{fontFamily:"Lora,serif",fontSize:22,fontWeight:600,
           color:"var(--ink)",marginBottom:6}}>
           Daten werden geladen …
@@ -13358,7 +13626,7 @@ function LoadingScreen({steps,progress,region}){
         {/* Progressbar */}
         <div style={{height:8,background:"var(--line-soft)",borderRadius:99,overflow:"hidden",
           marginBottom:20,position:"relative"}}>
-          <div style={{
+          <div className="progress-shimmer" style={{
             position:"absolute",left:0,top:0,height:"100%",borderRadius:99,
             background:"linear-gradient(90deg,var(--ifas-blue),var(--ifas-green))",
             width:progress+"%",
@@ -13372,7 +13640,8 @@ function LoadingScreen({steps,progress,region}){
         {/* Schritte */}
         <div style={{display:"flex",flexDirection:"column",gap:10,textAlign:"left"}}>
           {steps.map((s,i)=>(
-            <div key={i} style={{display:"flex",alignItems:"center",gap:12,
+            <div key={i} className={s.status==="running"?"step-running":undefined}
+              style={{display:"flex",alignItems:"center",gap:12,
               padding:"10px 14px",borderRadius:10,
               background:s.status==="done"?"#edf7ee":s.status==="running"?"var(--ifas-blue-soft)":"var(--line-soft)",
               border:"1px solid "+(s.status==="done"?"#90d4a0":s.status==="running"?"#b8ccee":"transparent"),
@@ -14095,7 +14364,7 @@ function GesamtberichtModal({region,dwd,destatis,gerics,szenario,zeithorizont,ge
                 color:"var(--ifas-blue-dark)",margin:"0 0 6px"}}>
                 Klimarisiko &amp; Anpassung – Kurzfassung</h1>
               <div style={{fontFamily:"'Lora',serif",fontSize:15,color:"var(--ink)",marginBottom:6}}>
-                {gebietNom}{region && !gebietNom.includes(region.typ) &&
+                {gebietNom}{region && !gebietNom.includes(region.typ) && !/^Regionalverband/.test(region.name) &&
                   <span style={{color:"var(--ink-soft)",fontSize:12.5}}> – {region.typ}</span>}
               </div>
               <div style={{fontSize:10.5,color:"var(--ink-soft)",marginBottom:18}}>
@@ -14231,7 +14500,7 @@ function GesamtberichtModal({region,dwd,destatis,gerics,szenario,zeithorizont,ge
                     Klimarisiko &amp; Anpassung</h1>
                   <div style={{fontFamily:"'Lora',serif",fontSize:18,color:"var(--ink)",marginBottom:14}}>
                     Dokumentation für {gebietNom}
-                    {region && !gebietNom.includes(region.typ) &&
+                    {region && !gebietNom.includes(region.typ) && !/^Regionalverband/.test(region.name) &&
                       <span style={{color:"var(--ink-soft)",fontSize:14}}> – {region.typ}</span>}
                   </div>
                   <div style={{fontSize:11,color:"var(--ink-soft)",lineHeight:1.6,maxWidth:380}}>
@@ -17124,6 +17393,9 @@ function App(){
           </div>
         </div>
 
+        {/* key={tab}: erzwingt Remount je Reiter → choreografierter Einblend-
+            Stagger (.tab-panel / riseIn) bei jedem Tab-Wechsel */}
+        <div key={tab} className="tab-panel">
         {tab==="profil"   && dwd && destatis && gerics &&
           <RegionProfile region={region} dwd={dwd} destatis={destatis} gerics={gerics}/>}
         {tab==="stakeholder" &&
@@ -17169,6 +17441,7 @@ function App(){
             clusterRisiken={clusterRisiken}/>}
         {tab==="methodik" &&
           <MethodikView region={region}/>}
+        </div>
         <SchrittWeiter tab={tab} setTab={setTab} onReport={()=>setShowReport(true)}/>
       </div>
       <Footer onMethodik={()=>{ setTab("methodik"); window.scrollTo({top:0,behavior:"smooth"}); }}/>
